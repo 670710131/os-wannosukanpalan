@@ -3,10 +3,11 @@ import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 
 /**
- * Multi-threaded file server (Java 21+).
+ * Multi-threaded file server (Java 8 version).
  * Usage: java Server <port> <dir> [trad|nio]
  *
  * Protocol (text header lines ending in \n, then optional binary payload):
@@ -25,34 +26,32 @@ public class Server {
             return;
         }
         int port = Integer.parseInt(a[0]);
-        root = Path.of(a[1]).toAbsolutePath().normalize();
+        root = Paths.get(a[1]).toAbsolutePath().normalize();
         nio = a.length > 2 && a[2].equalsIgnoreCase("nio");
         System.out.println("Serving " + root + " on port " + port + " mode=" + (nio ? "nio" : "trad"));
 
-        try (ServerSocketChannel ssc = ServerSocketChannel.open();
-             ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            ssc.bind(new InetSocketAddress(port));
-            while (true) {
-                SocketChannel ch = ssc.accept();
-                pool.submit(() -> handle(ch));
-            }
+        ServerSocketChannel ssc = ServerSocketChannel.open();
+        ExecutorService pool = Executors.newCachedThreadPool(); // Java 8: thread pool
+        ssc.bind(new InetSocketAddress(port));
+        while (true) {
+            final SocketChannel ch = ssc.accept();
+            pool.submit(() -> handle(ch));
         }
     }
 
     static void handle(SocketChannel ch) {
-        try (ch) {
+        try (SocketChannel c = ch) {
             InputStream in = ch.socket().getInputStream();
             OutputStream out = ch.socket().getOutputStream();
             String line;
             while ((line = readLine(in)) != null) {
                 String[] p = line.trim().split("\\s+");
-                switch (p[0].toUpperCase()) {
-                    case "LIST" -> list(out);
-                    case "INFO" -> info(p, out);
-                    case "GET" -> get(p, ch, out);
-                    case "QUIT" -> { return; }
-                    default -> send(out, "ERROR 400 unknown command\n");
-                }
+                String cmd = p[0].toUpperCase();
+                if (cmd.equals("LIST")) list(out);
+                else if (cmd.equals("INFO")) info(p, out);
+                else if (cmd.equals("GET")) get(p, ch, out);
+                else if (cmd.equals("QUIT")) return;
+                else send(out, "ERROR 400 unknown command\n");
             }
         } catch (IOException e) {
             // client disconnected or transfer failed; connection is closed by try-with-resources
@@ -119,11 +118,19 @@ public class Server {
     static void sendNio(Path f, long off, long len, SocketChannel ch) throws IOException {
         try (FileChannel fc = FileChannel.open(f, StandardOpenOption.READ)) {
             long pos = off, rem = len;
+            long lastProgress = System.nanoTime();
             while (rem > 0) {
                 long n = fc.transferTo(pos, rem, ch);
-                if (n <= 0) throw new EOFException("transferTo made no progress");
-                pos += n;
-                rem -= n;
+                if (n > 0) {
+                    pos += n;
+                    rem -= n;
+                    lastProgress = System.nanoTime();
+                } else {
+                    // 0 = socket send buffer is full (happens on virtual threads); wait and retry
+                    if (System.nanoTime() - lastProgress > 30_000_000_000L)
+                        throw new IOException("transferTo stalled for 30s");
+                    LockSupport.parkNanos(100_000);
+                }
             }
         }
     }

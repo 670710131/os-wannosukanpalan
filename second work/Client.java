@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Multi-threaded download client (Java 21+).
+ * Multi-threaded download client (Java 8 version).
  * Usage:
  *   java Client <host> <port> LIST
  *   java Client <host> <port> <file> <trad|nio> <workers> [outputFile]
@@ -29,7 +29,7 @@ public class Client {
         String name = a[2];
         boolean nio = a[3].equalsIgnoreCase("nio");
         int workers = Integer.parseInt(a[4]);
-        Path out = Path.of(a.length > 5 ? a[5] : "downloaded_" + name);
+        Path out = Paths.get(a.length > 5 ? a[5] : "downloaded_" + name);
 
         long size = info(name);
 
@@ -171,6 +171,8 @@ public class Client {
             int n;
             while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
         }
-        return HexFormat.of().formatHex(md.digest());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : md.digest()) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 }
