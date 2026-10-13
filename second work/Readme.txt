@@ -16,7 +16,7 @@ certutil -hashfile files\test.bin SHA256
 java -cp out Server 5000 files nio
 
 //step 6 client powershell
-java -cp out Server 5000 files nio
+java -cp out Client localhost 5000 LIST
 
 //step 7 client for testing 
 function Send-Cmd($c) {
