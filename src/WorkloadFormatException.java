@@ -15,7 +15,7 @@ public class WorkloadFormatException extends Exception {
 
     public WorkloadFormatException(int lineNumber, String reason) {
         super(lineNumber > 0
-                ? "บรรทัดที่ " + lineNumber + ": " + reason
+                ? "Line " + lineNumber + ": " + reason
                 : reason);
         this.lineNumber = lineNumber;
     }

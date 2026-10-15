@@ -13,6 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  *
  * วิธีรัน:
  *   java Main jobs_standard.csv priority 3 1 2
+    public static void main(String[] args) {
  */
 public class Main {
 
@@ -22,7 +23,7 @@ public class Main {
         try {
             config = Config.parse(args);
         } catch (IllegalArgumentException e) {
-            System.err.println("ผิดพลาด: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
             System.err.println();
             System.err.println(Config.USAGE);
             System.exit(1);
@@ -35,50 +36,48 @@ public class Main {
         try {
             jobs = WorkloadLoader.load(config.workloadPath);
         } catch (WorkloadFormatException e) {
-            System.err.println("ไฟล์ workload ผิดรูปแบบ — " + e.getMessage());
+            System.err.println("Malformed workload file — " + e.getMessage());
             System.exit(1);
             return;
         } catch (java.io.IOException e) {
-            System.err.println("เปิดไฟล์ \"" + config.workloadPath + "\" ไม่ได้");
-            System.err.println("ตรวจว่าไฟล์มีอยู่จริงและ path ถูกต้อง (สั่ง java จากโฟลเดอร์ใด)");
+            System.err.println("Cannot open file \"" + config.workloadPath + "\"");
+            System.err.println("Check that the file exists and the path is correct (and which folder you run java from)");
             System.exit(1);
             return;
         }
         logger.systemStart(config);
-        logger.systemEvent("โหลดงานได้ " + jobs.size() + " ชิ้น");
+        logger.systemEvent("Loaded " + jobs.size() + " jobs");
+        long startTimeMs = System.currentTimeMillis();
 
         // ---------- 3. สร้างส่วนประกอบของระบบ ----------
         ResourceManager resources = new ResourceManager(config.printerPermits, config.databasePermits);
         ReadyQueue readyQueue = new ReadyQueue(config.policy);
         Statistics statistics = new Statistics();
-        BlockingQueue<Job> intake = new LinkedBlockingQueue<>();
+        BlockingQueue<Job> inbox = new LinkedBlockingQueue<>();
 
         // ---------- 4. สร้างและเริ่ม Thread ----------
-        // ลำดับ start: ฝั่งผู้บริโภค (Worker, Scheduler, Monitor) ก่อน แล้ว JobGenerator เป็นตัวสุดท้าย
-        // ความถูกต้องไม่ขึ้นกับลำดับ เพราะส่งงานผ่านคิวที่บล็อกได้ แต่เริ่ม Generator ท้ายสุด
-        // ทำให้ผู้รับพร้อมก่อนงานแรกเข้า และงานแรก (arrival=0) ไม่ถูกหน่วงโดยการสร้าง Thread อื่น
+        // start ฝั่งผู้บริโภคก่อน (Worker -> Scheduler -> Monitor) แล้วค่อย start JobGenerator
+        // ตัวสุดท้าย เพื่อไม่ให้พลาดงานแรก; ความถูกต้องไม่ขึ้นกับลำดับ
+        // เพราะใช้ blocking queue + poison pill
         List<Worker> workers = new ArrayList<>();
         for (int i = 1; i <= config.workers; i++) {
             Worker w = new Worker("worker-" + i, readyQueue, resources, statistics, logger);
             workers.add(w);
             w.start();
         }
-        Scheduler scheduler = new Scheduler(intake, readyQueue, logger);
+        Scheduler scheduler = new Scheduler(inbox, readyQueue, logger);
+        Monitor monitor = new Monitor(readyQueue, resources, statistics, logger, jobs.size());
+        JobGenerator generator = new JobGenerator(jobs, inbox, logger);
         scheduler.start();
-        Monitor monitor = new Monitor(readyQueue, resources, statistics, logger);
         monitor.start();
-        JobGenerator generator = new JobGenerator(jobs, intake, logger);
         generator.start();
 
-        // ---------- 5-6. รอจนงานเสร็จครบ แล้วหยุดทุก Thread ตามลำดับ ----------
-        // ไม่มีการเดาเวลา ใช้ห่วงโซ่สัญญาณ:
-        //   Generator ปล่อยครบ -> ส่ง poison pill -> Scheduler จบ
-        //   -> close ReadyQueue -> Worker ทำงานที่ค้างจนหมดแล้วได้ null และจบเอง
-        //   -> join Worker ครบ = งานเสร็จครบ -> interrupt Monitor
+        // ---------- 5-6. รอจนงานเสร็จครบ แล้วหยุดทุก Thread ----------
+        // generator ส่ง poison -> scheduler ปิด ReadyQueue -> worker ทำงานที่ค้างจนหมด
+        // แล้ว take() ได้ null จึงหยุดเอง ดังนั้น join worker = งานเสร็จครบจริง
         try {
             generator.join();
             scheduler.join();
-            readyQueue.close();
             for (Worker w : workers) {
                 w.join();
             }
@@ -86,17 +85,11 @@ public class Main {
             monitor.join();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.err.println("main ถูก interrupt ก่อนระบบหยุดสมบูรณ์");
+            System.err.println("main was interrupted before all jobs finished");
         }
 
         // ---------- 7. สรุปผล ----------
-        // makespan = เวลาที่งานชิ้นสุดท้ายเสร็จ (completeMs ใหญ่สุด ฐานเวลาเดียวกับ logger.now())
-        long makespanMs = 0;
-        for (Job j : jobs) {
-            if (j.isCompleted() && j.completeMs > makespanMs) {
-                makespanMs = j.completeMs;
-            }
-        }
+        long makespanMs = statistics.lastFinishMs();
         statistics.printSummary(jobs, makespanMs);
         logger.systemStop(statistics.completedCount(), jobs.size());
     }

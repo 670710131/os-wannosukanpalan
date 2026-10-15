@@ -19,7 +19,7 @@ public enum ResourceType {
      */
     public static ResourceType parse(String text) {
         if (text == null) {
-            throw new IllegalArgumentException("resource เป็นค่าว่าง");
+            throw new IllegalArgumentException("resource is empty");
         }
         String normalized = text.trim().toUpperCase();
         for (ResourceType type : values()) {
@@ -28,6 +28,6 @@ public enum ResourceType {
             }
         }
         throw new IllegalArgumentException(
-                "resource ต้องเป็น NONE, PRINTER หรือ DATABASE เท่านั้น แต่พบ \"" + text.trim() + "\"");
+                "resource must be NONE, PRINTER, or DATABASE only, but found \"" + text.trim() + "\"");
     }
 }

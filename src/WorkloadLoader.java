@@ -70,14 +70,14 @@ public final class WorkloadLoader {
 
                 Job job = parseLine(line, lineNumber, jobs.size());
                 if (!seenIds.add(job.id)) {
-                    throw new WorkloadFormatException(lineNumber, "รหัสงาน \"" + job.id + "\" ซ้ำกับบรรทัดก่อนหน้า");
+                    throw new WorkloadFormatException(lineNumber, "Job id \"" + job.id + "\" duplicates an earlier line");
                 }
                 jobs.add(job);
             }
         }
 
         if (jobs.isEmpty()) {
-            throw new WorkloadFormatException(0, "ไฟล์ " + path + " ไม่มีข้อมูลงานเลย");
+            throw new WorkloadFormatException(0, "File " + path + " contains no jobs");
         }
         return Collections.unmodifiableList(jobs);
     }
@@ -95,7 +95,7 @@ public final class WorkloadLoader {
         String[] parts = line.split(",", -1);
         if (parts.length != COLUMN_COUNT) {
             throw new WorkloadFormatException(lineNumber,
-                    "ต้องมี " + COLUMN_COUNT + " คอลัมน์ แต่พบ " + parts.length + " คอลัมน์");
+                    "Expected " + COLUMN_COUNT + " columns but found " + parts.length + " columns");
         }
         for (int i = 0; i < parts.length; i++) {
             parts[i] = parts[i].trim();
@@ -103,7 +103,7 @@ public final class WorkloadLoader {
 
         String id = parts[0];
         if (id.isEmpty()) {
-            throw new WorkloadFormatException(lineNumber, "คอลัมน์ id เป็นค่าว่าง");
+            throw new WorkloadFormatException(lineNumber, "Column id is empty");
         }
 
         long arrivalMs = parseNonNegativeLong(parts[1], "arrivalMs", lineNumber);
@@ -121,11 +121,11 @@ public final class WorkloadLoader {
 
         if (resource == ResourceType.NONE && resourceMs != 0) {
             throw new WorkloadFormatException(lineNumber,
-                    "เมื่อ resource เป็น NONE ค่า resourceMs ต้องเป็น 0 แต่พบ " + resourceMs);
+                    "When resource is NONE, resourceMs must be 0 but found " + resourceMs);
         }
         if (resource != ResourceType.NONE && resourceMs <= 0) {
             throw new WorkloadFormatException(lineNumber,
-                    "เมื่อ resource เป็น " + resource + " ค่า resourceMs ต้องมากกว่า 0 แต่พบ " + resourceMs);
+                    "When resource is " + resource + ", resourceMs must be greater than 0 but found " + resourceMs);
         }
 
         return new Job(id, arrivalMs, priority, workMs, resource, resourceMs, sequence);
@@ -138,11 +138,11 @@ public final class WorkloadLoader {
             value = Long.parseLong(text);
         } catch (NumberFormatException e) {
             throw new WorkloadFormatException(lineNumber,
-                    "คอลัมน์ " + column + " ต้องเป็นจำนวนเต็ม แต่พบ \"" + text + "\"");
+                    "Column " + column + " must be an integer but found \"" + text + "\"");
         }
         if (value < 0) {
             throw new WorkloadFormatException(lineNumber,
-                    "คอลัมน์ " + column + " ต้องไม่ติดลบ แต่พบ " + value);
+                    "Column " + column + " must not be negative but found " + value);
         }
         return value;
     }
@@ -154,11 +154,11 @@ public final class WorkloadLoader {
             value = Integer.parseInt(text);
         } catch (NumberFormatException e) {
             throw new WorkloadFormatException(lineNumber,
-                    "คอลัมน์ " + column + " ต้องเป็นจำนวนเต็ม แต่พบ \"" + text + "\"");
+                    "Column " + column + " must be an integer but found \"" + text + "\"");
         }
         if (value < 1) {
             throw new WorkloadFormatException(lineNumber,
-                    "คอลัมน์ " + column + " ต้องมีค่าตั้งแต่ 1 ขึ้นไป (1 คือสำคัญที่สุด) แต่พบ " + value);
+                    "Column " + column + " must be 1 or greater (1 is the most important) but found " + value);
         }
         return value;
     }

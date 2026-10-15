@@ -14,6 +14,7 @@ public class Statistics {
     private long sumTurnaround = 0;
     private long sumResourceWait = 0;
     private int resourceJobs = 0;
+    private long lastFinish = 0;                                  // NEW
 
     /** บันทึกว่างานชิ้นหนึ่งเสร็จแล้ว เรียกโดย Worker หลายตัวพร้อมกันได้ */
     public synchronized void recordCompletion(Job job) {
@@ -24,6 +25,15 @@ public class Statistics {
             resourceJobs++;
             sumResourceWait += job.resourceWaitMs();
         }
+        long finishMs = job.enteredMs + job.turnaroundMs();       // NEW
+        if (finishMs > lastFinish) {                              // NEW
+            lastFinish = finishMs;                                // NEW
+        }
+    }
+
+    /** เวลาที่งานสุดท้ายเสร็จ (ใช้เป็น makespan) */
+    public synchronized long lastFinishMs() {                     // NEW
+        return lastFinish;
     }
 
     /** จำนวนงานที่เสร็จแล้ว */

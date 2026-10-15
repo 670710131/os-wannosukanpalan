@@ -12,13 +12,13 @@ public final class Config {
 
     public static final String USAGE =
             "Usage: java Main <workload.csv> <fcfs|priority> <workers> <printerPermits> <databasePermits>\n"
-          + "  workload.csv      ไฟล์ชุดงานทดสอบ\n"
-          + "  fcfs | priority   นโยบายการจัดลำดับงาน\n"
-          + "  workers           จำนวน Worker Thread (ตั้งแต่ 1 ขึ้นไป)\n"
-          + "  printerPermits    จำนวนสิทธิ์ใช้ PRINTER พร้อมกัน (ตั้งแต่ 1 ขึ้นไป)\n"
-          + "  databasePermits   จำนวนสิทธิ์ใช้ DATABASE พร้อมกัน (ตั้งแต่ 1 ขึ้นไป)\n"
+          + "  workload.csv      test workload file\n"
+          + "  fcfs | priority   job scheduling policy\n"
+          + "  workers           number of Worker Threads (1 or more)\n"
+          + "  printerPermits    number of concurrent PRINTER permits (1 or more)\n"
+          + "  databasePermits   number of concurrent DATABASE permits (1 or more)\n"
           + "\n"
-          + "ตัวอย่าง: java Main jobs_standard.csv priority 3 1 2";
+          + "Example: java Main jobs_standard.csv priority 3 1 2";
 
     /** นโยบายการจัดลำดับงาน */
     public enum Policy {
@@ -50,12 +50,12 @@ public final class Config {
     public static Config parse(String[] args) {
         if (args.length != 5) {
             throw new IllegalArgumentException(
-                    "ต้องใส่ argument ให้ครบ 5 ตัว แต่ได้รับ " + args.length + " ตัว");
+                    "Exactly 5 arguments are required, but received " + args.length);
         }
 
         String workloadPath = args[0].trim();
         if (workloadPath.isEmpty()) {
-            throw new IllegalArgumentException("ชื่อไฟล์ workload เป็นค่าว่าง");
+            throw new IllegalArgumentException("Workload file name is empty");
         }
 
         Policy policy;
@@ -66,7 +66,7 @@ public final class Config {
             policy = Policy.PRIORITY;
         } else {
             throw new IllegalArgumentException(
-                    "นโยบายต้องเป็น fcfs หรือ priority เท่านั้น แต่พบ \"" + args[1].trim() + "\"");
+                    "Policy must be either fcfs or priority, but found \"" + args[1].trim() + "\"");
         }
 
         int workers = parseAtLeastOne(args[2], "workers");
@@ -82,11 +82,11 @@ public final class Config {
             value = Integer.parseInt(text.trim());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
-                    name + " ต้องเป็นจำนวนเต็ม แต่พบ \"" + text.trim() + "\"");
+                    name + " must be an integer, but found \"" + text.trim() + "\"");
         }
         if (value < 1) {
             throw new IllegalArgumentException(
-                    name + " ต้องมีค่าตั้งแต่ 1 ขึ้นไป แต่พบ " + value);
+                    name + " must be 1 or greater, but found " + value);
         }
         return value;
     }

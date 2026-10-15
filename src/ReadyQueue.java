@@ -62,7 +62,7 @@ public class ReadyQueue {
         lock.lock();
         try {
             if (closed) {
-                throw new IllegalStateException("ReadyQueue ถูกปิดแล้ว ใส่งาน " + job.id + " ไม่ได้");
+                throw new IllegalStateException("ReadyQueue is already closed, cannot add job " + job.id);
             }
             heap.add(new Entry(job, nextTicket++));
             notEmpty.signal(); // ปลุก Worker ที่รออยู่หนึ่งตัวพอ เพราะมีงานเพิ่มชิ้นเดียว

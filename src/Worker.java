@@ -38,7 +38,7 @@ public class Worker extends Thread {
                     processJob(job);
                     done = true;
                 } catch (RuntimeException e) {
-                    logger.systemEvent("งาน " + job.id + " ล้มเหลว: " + e);
+                    logger.systemEvent("Job " + job.id + " failed: " + e);
                 } finally {
                     if (done) {
                         readyQueue.jobFinished();

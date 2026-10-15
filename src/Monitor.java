@@ -13,14 +13,18 @@ public class Monitor extends Thread {
 
     private final ReadyQueue readyQueue;
     private final ResourceManager resources;
+    private final Statistics statistics;
     private final ProjectLogger logger;
+    private final int totalJobs;
 
     public Monitor(ReadyQueue readyQueue, ResourceManager resources,
-                   Statistics statistics, ProjectLogger logger) {
+                   Statistics statistics, ProjectLogger logger, int totalJobs) {
         super("monitor");
         this.readyQueue = readyQueue;
         this.resources = resources;
+        this.statistics = statistics;
         this.logger = logger;
+        this.totalJobs = totalJobs;
     }
 
     @Override
@@ -28,6 +32,9 @@ public class Monitor extends Thread {
         try {
             while (!isInterrupted()) {
                 Thread.sleep(INTERVAL_MS);
+                if (statistics.completedCount() >= totalJobs) {
+                    break;
+                }
                 int[] s = readyQueue.snapshot();
                 logger.monitor(s[0], s[1], s[2], resources.status());
             }

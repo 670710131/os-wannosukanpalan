@@ -31,6 +31,7 @@ public class Scheduler extends Thread {
                 }
                 readyQueue.add(job);
             }
+            readyQueue.close();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
